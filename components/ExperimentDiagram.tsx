@@ -27,7 +27,11 @@ function Divider({v,loaded}:{v:Values;loaded:boolean}) {
   </>;
 }
 function Rc({v,alt}:{v:Values;alt:boolean}) {
-  return <><Terminal x={95} y={95}/><Label x={95} y={75}>{alt?"0 V":format(v.vs,"V")} step</Label><Wire d="M100 95h81"/><R x={181} y={95}/><Label x={207} y={71}>R1 · {format(v.r,"kΩ")}</Label><Wire d="M231 95h126m-55 0v22"/><Dot x={302} y={95}/><C x={302} y={117}/><Wire d="M302 153v23"/><Ground x={302} y={176}/><Label x={326} y={141} anchor="start">C1 · {format(v.c,"µF")}</Label><Terminal x={362} y={95}/><Label x={378} y={99} anchor="start" accent>Vc(t)</Label></>;
+  const high = format(v.vs, "V");
+  return <><Terminal x={95} y={95}/>
+    <Label x={95} y={49}>Input step</Label>
+    <Label x={95} y={71}>{alt ? high + " → 0 V" : "0 V → " + high}</Label>
+    <Wire d="M100 95h81"/><R x={181} y={95}/><Label x={217} y={71}>R1 · {format(v.r,"kΩ")}</Label><Wire d="M231 95h126m-55 0v22"/><Dot x={302} y={95}/><C x={302} y={117}/><Wire d="M302 153v23"/><Ground x={302} y={176}/><Label x={326} y={141} anchor="start">C1 · {format(v.c,"µF")}</Label><Terminal x={362} y={95}/><Label x={378} y={99} anchor="start" accent>Vc(t)</Label></>;
 }
 function Loop({v,id}:{v:Values;id:string}) {
   const value = id==="power" ? format(v.ohms,"Ω") : format(v.r,"kΩ");

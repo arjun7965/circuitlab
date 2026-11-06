@@ -22,6 +22,41 @@ export function format(n: number, unit = "") {
   const value = Number(n.toPrecision(4));
   return String(value) + (unit ? " " + unit : "");
 }
+
+// Keep four significant figures while rounding a design bound toward safety.
+function roundedBound(value: number, direction: "up" | "down") {
+  const scale = 10 ** (3 - Math.floor(Math.log10(value)));
+  const scaled = value * scale;
+  return (direction === "up" ? Math.ceil(scaled) : Math.floor(scaled)) / scale;
+}
+
+function i2cMetrics(v: Values): Metric[] {
+  const nsPerKohm = riseTime(1000, v.cb * 1e-12) * 1e9;
+  const minTiming = 20 / nsPerKohm;
+  const maxTiming = 300 / nsPerKohm;
+  const minSink = (3.3 - 0.4) / 3; // V / mA = kΩ
+  const lower = Math.max(minTiming, minSink);
+  let displayedMin = roundedBound(lower, "up");
+  let displayedMax = roundedBound(maxTiming, "down");
+  if (lower <= maxTiming && displayedMin > displayedMax) {
+    // A narrow feasible interval needs more than four figures to stay usable.
+    displayedMin = lower;
+    displayedMax = maxTiming;
+  }
+  const violations: string[] = [];
+  if (v.r < minTiming) violations.push("Rise faster than 20 ns");
+  if (v.r > maxTiming) violations.push("Rise slower than 300 ns");
+  if (v.r < minSink) violations.push("Exceeds sink-current budget");
+  const status = lower > maxTiming
+    ? "No feasible passive pull-up at this capacitance and sink rating"
+    : violations.join(" · ") || "Meets the rise-time and sink-current limits";
+  return [
+    ["Rise time", Number((nsPerKohm * v.r).toFixed(4)) + " ns"],
+    ["Minimum pull-up", displayedMin + " kΩ"],
+    ["Maximum pull-up", displayedMax + " kΩ"],
+    ["Fast-mode check", status],
+  ];
+}
 export const models: Model[] = [
   {
     id: "divider", title: "Voltage divider", description: "Measure the divider tap, then connect a load and compare.",
@@ -85,26 +120,35 @@ export const models: Model[] = [
   },
   {
     id:"i2c",title:"I²C rise time",description:"Compare a passive pull-up with the Fast-mode rise-time budget.",
-    fields:[pullup,field("cb","Bus capacitance","pF",100,10,400,1)],equation:String.raw`t_{30\text{–}70\%}\approx0.8473R_p C_{\mathrm{bus}}`,
+    fields:[{...pullup,max:40},field("cb","Bus capacitance","pF",100,10,400,1)],equation:String.raw`t_{30\text{–}70\%}=\ln(7/3)\,R_p C_{\mathrm{bus}}`,
     observation:"Extra devices and longer wiring add capacitance. Lowering the pull-up resistance speeds up the rising edge but requires more sink current when the line is low.",
-    limits:"Passive pull-up at 3.3 V, Fast-mode 300 ns maximum. The illustrative 0.4 V at 3 mA sink specification gives a minimum of 0.967 kΩ. Check every bus participant.",source:i2c,
-    metrics:v=>{const tr=riseTime(v.r*1000,v.cb*1e-12)*1e9;return [["Rise time",format(tr,"ns")],["Maximum pull-up",format(300/(0.8473*v.cb),"kΩ")],["Example limits",v.r<(3.3-0.4)/3?"Sink current high":tr>300?"Edge too slow":"Within limits"]]}
+    limits:"Fast-mode rise time is 20–300 ns (UM10204 Table 11). This first-order model assumes a 3.3 V passive pull-up, lumped bus capacitance, and a weakest sink rated for 3 mA at 0.4 V. Both timing and sink current constrain the minimum resistor. The slowest permitted rise sets the maximum. If the limits do not overlap, reduce capacitance or revisit the bus mode and device ratings. Allow for real component tolerances.",
+    source:["NXP · I²C-bus specification, Table 11 and §7.1","https://www.nxp.com/docs/en/user-guide/UM10204.pdf"],
+    metrics:i2cMetrics
   },
   {
     id:"power",title:"Resistor power rating",description:"Find the heat in a resistor and a target rating with design margin.",
     fields:[{...supply,initial:5},field("ohms","Resistance","Ω",220,10,1000,1),field("usage","Maximum rating used","%",50,10,100,1)],
     equation:String.raw`P=\frac{V^2}{R},\quad P_{\mathrm{rated}}\geq \frac{P}{u}`,
     observation:"Twice the voltage gives four times the heating in a fixed resistor. Limiting the fraction of the rating used leaves room for thermal margin.",
-    limits:"Continuous DC operation at nominal resistance. Check the power derating curve, board temperature, pulse rating and working voltage for the chosen part.",source:textbook,
-    metrics:v=>{const p=v.vs**2/v.ohms;return [["Dissipation",format(p*1000,"mW")],["Target rating ≥",format(p*100/v.usage,"W")],["Current",format(v.vs/v.ohms*1000,"mA")]]}
+    limits:"The utilization factor u is the entered percentage divided by 100. For example, 50% gives u = 0.5. Select a rating at or above the displayed minimum after temperature derating. Check pulse and voltage ratings separately.",source:textbook,
+    metrics:v=>{const p=v.vs**2/v.ohms;return [["Dissipation",format(p*1000,"mW")],["Target rating ≥",roundedBound(p*100/v.usage,"up")+" W"],["Current",format(v.vs/v.ohms*1000,"mA")]]}
   },
   {
     id:"ldo",title:"LDO thermal estimate",description:"Estimate regulator heat from supply headroom and load current.",
-    fields:[{...supply,initial:5},field("out","Regulated output","V",3.3,0.8,5,0.1),field("ma","Load current","mA",100,1,500,1),field("theta","Thermal resistance","°C/W",65,10,250,1),field("amb","Ambient temperature","°C",25,0,85,1)],equation:String.raw`P\approx(V_{\mathrm{in}}-V_{\mathrm{out}})I_{\mathrm{load}},\quad T_j\approx T_a+P\theta_{\mathrm{JA}}`,
+    fields:[{...supply,initial:5},field("out","Regulated output","V",3.3,0.8,5,0.1),field("ma","Load current","mA",100,1,500,1),field("theta","Thermal resistance","°C/W",65,10,250,1),field("amb","Ambient temperature","°C",25,0,85,1),field("tjMax","Junction operating limit","°C",125,85,200,1)],equation:String.raw`P\approx(V_{\mathrm{in}}-V_{\mathrm{out}})I_{\mathrm{load}},\quad T_j\approx T_a+P\theta_{\mathrm{JA}}`,
     observation:"Reducing input voltage while maintaining sufficient headroom reduces heat. The same silicon can run warmer on a board with less copper.",
-    limits:"Assumes regulation with an illustrative 0.2 V dropout and negligible quiescent current. θJA is board dependent. Compare the estimate with the regulator’s operating limit.",source:["Texas Instruments · LDO thermals","https://www.ti.com/video/5845988024001"],
-    warning:v=>v.vs-v.out<0.2-1e-10?"Insufficient headroom for the assumed 0.2 V dropout. The target output cannot be guaranteed.":undefined,
-    metrics:v=>{const a=ldoPower(v.vs,v.out,v.ma/1000,v.amb,v.theta);return [["Power loss",format(a.watts,"W")],["Junction estimate",format(a.junction,"°C")],["Efficiency",format(100*v.out/v.vs,"%")]]}
+    limits:"Assumes steady-state regulation, illustrative 0.2 V dropout, negligible quiescent current, and board-specific θJA. Replace the example 125 °C operating limit with the datasheet’s maximum recommended junction temperature. Thermal shutdown is device-specific.",
+    source:["Texas Instruments · LDO thermals","https://www.ti.com/video/5845988024001"],
+    warning:v=>{
+      if (v.vs-v.out<0.2-1e-10) return "Insufficient headroom for the assumed 0.2 V dropout. The target output cannot be guaranteed.";
+      const {watts,junction}=ldoPower(v.vs,v.out,v.ma/1000,v.amb,v.theta);
+      if (junction>v.tjMax) {
+        const budget=(v.tjMax-v.amb)/v.theta;
+        return `Thermally infeasible at the selected ${v.tjMax} °C limit. Regulating this load would dissipate ${format(watts,"W")}. The modeled thermal budget is ${format(budget,"W")}. Reduce the load, input voltage, ambient temperature, or thermal resistance.`;
+      }
+    },
+    metrics:v=>{const a=ldoPower(v.vs,v.out,v.ma/1000,v.amb,v.theta);return [["Power loss",format(a.watts,"W")],["Junction estimate",format(a.junction,"°C")],["Operating limit",format(v.tjMax,"°C")],["Efficiency",format(100*v.out/v.vs,"%")]]}
   },
   {
     id:"decoupling",title:"Decoupling transient",description:"Estimate how far a rail falls while a capacitor supports a load step.",

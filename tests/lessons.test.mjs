@@ -30,6 +30,28 @@ function lesson(slug) {
   return result;
 }
 
+// Answer text and question position also identify existing local quiz history.
+test("Reviewed multiple-choice keys are present and retain their question positions", () => {
+  const reviewedKeys = {
+    voltage: ["Supply to midpoint", "The high-level guarantee is insufficient"],
+    current: ["In series with the sensor supply", "The pull-up feeds a path through the pin to ground"],
+    resistance: ["Halves it", "Its continuous dissipation exceeds the rating"],
+    "ohms-law": ["The measured drop across the resistor", "Peak current lacks a defined limit"],
+    capacitors: ["Across the resistor", "The reset threshold and supply ramp"],
+    "voltage-dividers": ["Source resistance rises tenfold", "The ADC acquisition time and source impedance"],
+    mosfets: ["RDS(on) guaranteed at the available VGS", "A path for coil current after turn-off"],
+  };
+  for (const [slug, keys] of Object.entries(reviewedKeys)) {
+    const questions = lesson(slug).quiz;
+    assert.equal(questions[0].options, undefined, slug);
+    assert.deepEqual(questions.slice(1).map(question => question.answer), keys, slug);
+    for (const question of questions.slice(1)) {
+      assert.equal(question.options.filter(option => option === question.answer).length, 1, slug);
+      assert.ok(question.explanation.trim(), slug);
+    }
+  }
+});
+
 test("Voltage uses a signed difference between nodes", () => {
   const data = lesson("voltage");
   const [a, b, reading] = quantities(data.worked, ["V", "V", "V"]);

@@ -66,17 +66,58 @@ test("open-drain: released and asserted states of a 3.3 V line with 3.3 kΩ pull
 });
 test("I²C: TI SLVA689 200 pF Fast-mode worked example and both resistor bounds", () => {
   assert.ok(Math.abs(riseTime(1000,200e-12)*1e9-169.46) < 0.01);
-  assert.deepEqual(measured("i2c",{r:1,cb:200}),{"Rise time":"169.5 ns","Maximum pull-up":"1.77 kΩ","Example limits":"Within limits"});
-  assert.equal(measured("i2c",{r:2,cb:200})["Example limits"],"Edge too slow");
-  assert.equal(measured("i2c",{r:0.9,cb:200})["Example limits"],"Sink current high");
+  const nominal=measured("i2c",{r:1,cb:200});
+  assert.equal(nominal["Rise time"],"169.4596 ns");
+  assert.equal(nominal["Maximum pull-up"],"1.77 kΩ");
+  assert.equal(nominal["Fast-mode check"],"Meets the rise-time and sink-current limits");
+  assert.match(measured("i2c",{r:2,cb:200})["Fast-mode check"],/slower than 300/);
+  assert.match(measured("i2c",{r:0.9,cb:200})["Fast-mode check"],/sink-current budget/);
+});
+test("Fast-mode rejects an 8.473 ns edge despite adequate sink capability", () => {
+  const fast=measured("i2c",{r:1,cb:10});
+  assert.equal(fast["Rise time"],"8.473 ns");
+  assert.match(fast["Fast-mode check"],/faster than 20/);
+});
+test("400 pF produces disjoint timing and sink-current bounds for the example driver", () => {
+  for(const r of [0.8,0.93,1,4.7]) {
+    const values=measured("i2c",{r,cb:400});
+    assert.ok(parseFloat(values["Minimum pull-up"])>parseFloat(values["Maximum pull-up"]));
+    assert.match(values["Fast-mode check"],/No feasible passive pull-up/);
+  }
+});
+test("displayed feasible pull-up endpoints pass when re-entered, including a narrow interval", () => {
+  for (const cb of [10,100,200,366,300/(Math.log(7/3)*((3.3-0.4)/3))*0.9999999]) {
+    const bounds=measured("i2c",{cb,r:1});
+    for(const name of ["Minimum pull-up","Maximum pull-up"]) {
+      const r=parseFloat(bounds[name]);
+      assert.equal(measured("i2c",{r,cb})["Fast-mode check"],"Meets the rise-time and sink-current limits");
+    }
+  }
+  assert.match(measured("i2c",{r:3.541,cb:100})["Fast-mode check"],/slower than 300/);
 });
 test("resistor sizing: 10 V across 100 Ω gives 1 W and requires 2 W at 50% utilization", () => {
   assert.deepEqual(measured("power",{vs:10,ohms:100,usage:50}),{"Dissipation":"1000 mW","Target rating ≥":"2 W","Current":"100 mA"});
 });
+test("a displayed minimum power rating meets the requested utilization", () => {
+  const rating=parseFloat(measured("power",{vs:5,ohms:330,usage:50})["Target rating ≥"]);
+  assert.equal(rating,0.1516);
+  assert.ok((25/330)/rating <= 0.5);
+});
 test("LDO: 5 V to 3.3 V at 200 mA produces a 17 °C rise at 50 °C/W; dropout boundary", () => {
-  assert.deepEqual(measured("ldo",{vs:5,out:3.3,ma:200,amb:25,theta:50}),{"Power loss":"0.34 W","Junction estimate":"42 °C","Efficiency":"66 %"});
+  assert.deepEqual(measured("ldo",{vs:5,out:3.3,ma:200,amb:25,theta:50}),{"Power loss":"0.34 W","Junction estimate":"42 °C","Operating limit":"125 °C","Efficiency":"66 %"});
   assert.ok(evaluateFixture("ldo",{vs:3.4,out:3.3}).issue);
   assert.equal(evaluateFixture("ldo",{vs:3.5,out:3.3}).issue,undefined);
+});
+test("LDO distinguishes unsustainable heat dissipation from regulated operation", () => {
+  const result=evaluateFixture("ldo",{vs:12,out:0.8,ma:500,amb:85,theta:250});
+  assert.match(result.issue,/Thermally infeasible.*125 °C.*5.6 W.*0.16 W/);
+  assert.deepEqual(result.metrics,[]);
+});
+test("LDO accepts the exact operating limit and respects a device-specific limit", () => {
+  const inputs={vs:5,out:3,ma:200,amb:85,theta:100};
+  assert.equal(measured("ldo",inputs)["Junction estimate"],"125 °C");
+  assert.match(evaluateFixture("ldo",{...inputs,tjMax:124}).issue,/124 °C/);
+  assert.equal(measured("ldo",{...inputs,tjMax:150})["Operating limit"],"150 °C");
 });
 test("decoupling: 100 mA for 2 µs on 10 µF drops 20 mV, plus 5 mV for ESR; rail collapse", () => {
   assert.deepEqual(measured("decoupling",{ma:100,us:2,c:10,esr:50}),{"Rail droop":"25 mV","Final voltage":"3.275 V","ESR step":"5 mV"});

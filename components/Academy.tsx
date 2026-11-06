@@ -69,7 +69,8 @@ export function Blueprint({ kind = "divider" }: { kind?: string }) {
 }
 
 type Part = { id: string; symbol: string; name: string; purpose: string; selection: string; failure: string; check: string };
-type Walkthrough = { title: string; short: string; intro: string; parts: Part[]; stages: [string, string][]; source: [string, string] };
+type SdaSink = "MCU" | "sensor" | "released";
+type Walkthrough = { title: string; short: string; intro: string; parts: Part[]; stages: [string, string, SdaSink?][]; source: [string, string] };
 const circuits: Record<"reset" | "i2c", Walkthrough> = {
   reset: {
     title: "MCU reset circuit", short: "MCU reset",
@@ -91,15 +92,18 @@ const circuits: Record<"reset" | "i2c", Walkthrough> = {
     title: "I²C sensor interface", short: "I²C interface",
     intro: "Trace the clock and data lines between a controller and a sensor. Select a symbol to inspect its electrical constraints.",
     parts: [
-      { id: "r1", symbol: "R1", name: "SDA pull-up", purpose: "Each device can pull the data line low. When every device releases SDA, R1 charges the line capacitance toward 3.3 V.", selection: "For 4.7 kΩ and 100 pF, the 30–70% rise takes about 398 ns. That fits a 1 µs Standard-mode budget, but exceeds a 300 ns Fast-mode budget.", failure: "An excessively large resistor produces slow rising edges. Too small a resistor may prevent the weakest device from pulling SDA low enough.", check: "Use RP(min) = (VDD − VOL(max)) / IOL and RP(max) = tr(max) / (0.8473 × Cbus). Include parallel pull-ups on modules." },
+      { id: "r1", symbol: "R1", name: "SDA pull-up", purpose: "Each device can pull the data line low. When every device releases SDA, R1 charges the line capacitance toward 3.3 V.", selection: "For 4.7 kΩ and 100 pF, the 30–70% rise takes about 398 ns. That meets the 1 µs Standard-mode maximum and exceeds the 300 ns Fast-mode maximum.", failure: "An excessively large resistor produces slow rising edges. Too small a resistor can exceed a device’s sink-current limit or create an edge faster than the Fast-mode minimum.", check: "Fast-mode specifies a 20–300 ns rise. For a passive pull-up, choose at least the larger of (VDD − VOL(max)) / IOL and 20 ns / (0.8473 × Cbus). The timing upper bound is 300 ns / (0.8473 × Cbus). Include parallel pull-ups on modules and use the weakest device’s guaranteed sink rating." },
       { id: "r2", symbol: "R2", name: "SCL pull-up", purpose: "R2 raises the released clock line. A target that supports clock stretching can hold SCL low until it is ready.", selection: "Calculate the clock line’s own capacitance and rise time. Use the weakest guaranteed sink current among the devices that can pull it low.", failure: "A slow rising clock reduces available high time at the receiving pin. Extra cable or probe capacitance can expose a marginal board.", check: "Check the bus-mode limits, SCL high time, rise time, VOL and supported clock stretching behavior." },
-      { id: "u1", symbol: "U1", name: "MCU controller", purpose: "The controller generates clock pulses and releases SDA during the acknowledge bit so the addressed target can respond.", selection: "Configure the chosen pins for their I²C alternate function and open-drain behavior. Select timing values for the measured rise time.", failure: "A push-pull high output can fight another device pulling low. A wrong pin mux can leave both bus lines idle.", check: "Check the I/O supply domain, guaranteed high and low thresholds, current limits, pin mux and peripheral timing registers." },
-      { id: "u2", symbol: "U2", name: "Sensor target", purpose: "The sensor listens for its address and pulls SDA low to acknowledge. It also drives data during reads.", selection: "This direct connection assumes both devices accept the same 3.3 V bus high. Check all power states when rails can sequence independently.", failure: "An incompatible pull-up voltage can damage a pin or back-power a sleeping device. An address conflict gives ambiguous acknowledgments.", check: "Check absolute maximum ratings, operating thresholds, address straps, supported bus speed and power-off pin behavior." }
+      { id: "u1", symbol: "U1", name: "MCU controller", purpose: "The MCU supplies the clocks. After transmitting an address or write-data byte it releases SDA for the target’s response. After receiving read data, it pulls SDA low to request another byte or releases SDA to end the read.", selection: "Configure the chosen pins for their I²C alternate function and open-drain behavior. Select timing values for the measured rise time.", failure: "A push-pull high output can fight another device pulling low. A wrong pin mux can leave both bus lines idle.", check: "Check the I/O supply domain, guaranteed high and low thresholds, current limits, pin mux and peripheral timing registers." },
+      { id: "u2", symbol: "U2", name: "Sensor target", purpose: "The addressed sensor pulls SDA low to acknowledge its address and accepted write data. When transmitting read data, it releases SDA for the MCU’s response on the ninth clock.", selection: "This direct connection assumes both devices accept the same 3.3 V bus high. Check all power states when rails can sequence independently.", failure: "An incompatible pull-up voltage can damage a pin or back-power a sleeping device. An address conflict gives ambiguous acknowledgments.", check: "Check absolute maximum ratings, operating thresholds, address straps, supported bus speed and power-off pin behavior." }
     ],
     stages: [
-      ["Bus idle", "Both devices release SDA and SCL. The two pull-ups charge the independent nets to 3.3 V. At steady state only leakage current flows."],
-      ["START", "With SCL high, the controller pulls SDA low. That falling edge signals START. R1 now sources current through the controller’s open-drain output."],
-      ["Acknowledge", "After eight data bits, the controller releases SDA. During the ninth clock high, an acknowledging target holds SDA low. The line voltage resembles START’s final level, but timing and the device sinking current differ."]
+      ["Bus idle", "Both devices release SDA and SCL. Each pull-up brings its line to 3.3 V. At steady state only leakage current flows.", "released"],
+      ["START", "With SCL high, the MCU pulls SDA low. This falling edge signals START. R1 now supplies current through the MCU’s open-drain output.", "MCU"],
+      ["Address/write ACK", "After sending the seven-bit address and direction bit, the MCU releases SDA. The addressed sensor pulls SDA low during the ninth clock to acknowledge either direction. The same handoff follows each accepted write-data byte.", "sensor"],
+      ["Address/write NACK", "The MCU releases SDA after sending the byte. If no sensor acknowledges the address or the addressed sensor declines a write byte, SDA stays high on the ninth clock. The MCU may issue STOP or a repeated START.", "released"],
+      ["Read-data ACK", "After transmitting eight data bits, the sensor releases SDA. The MCU now receives data. To request another byte, it pulls SDA low for the ninth clock, which it also generates.", "MCU"],
+      ["Final read NACK", "After the final read byte, the sensor releases SDA and the MCU leaves it released. SDA is high on the ninth clock. This NACK signals a normal end of reading before the MCU issues STOP or a repeated START.", "released"]
     ],
     source: ["Texas Instruments · I²C bus pull-up calculation", "https://www.ti.com/lit/an/slva689/slva689.pdf"]
   }
@@ -144,7 +148,7 @@ function ResetDrawing(props: PickProps & { stage: number }) {
   </>;
 }
 
-function BusDrawing(props: PickProps & { stage: number }) {
+function BusDrawing(props: PickProps & { sink: SdaSink }) {
   return <>
     <text x="289" y="28" textAnchor="middle">+3.3 V</text>
     <path d="M235 57V40h106v17M235 99v52M341 99v91M150 151h184m14 0h89m-287 39h287" />
@@ -160,13 +164,15 @@ function BusDrawing(props: PickProps & { stage: number }) {
     </Target>
     <Target {...props} id="u1" name="U1 I2C controller" bounds={[30, 115, 130, 108]}>
       <rect className="cl-chip" x="38" y="122" width="112" height="93" rx="4" />
-      <text x="94" y="153" textAnchor="middle">U1 · MCU</text><text x="94" y="177" textAnchor="middle" className="cl-value">Controller</text>
+      <text x="94" y="149" textAnchor="middle">U1 · MCU</text><text x="94" y="170" textAnchor="middle" className="cl-value">Controller</text>
+      <text x="94" y="197" textAnchor="middle" className="cl-net">{props.sink === "MCU" ? "SDA sink" : "Released"}</text>
     </Target>
     <Target {...props} id="u2" name="U2 sensor target" bounds={[428, 115, 139, 108]}>
       <rect className="cl-chip" x="437" y="122" width="121" height="93" rx="4" />
-      <text x="497" y="153" textAnchor="middle">U2 · SENSOR</text><text x="497" y="177" textAnchor="middle" className="cl-value">Target</text>
+      <text x="497" y="149" textAnchor="middle">U2 · SENSOR</text><text x="497" y="170" textAnchor="middle" className="cl-value">Target</text>
+      <text x="497" y="197" textAnchor="middle" className="cl-net">{props.sink === "sensor" ? "SDA sink" : "Released"}</text>
     </Target>
-    <text x="298" y="240" className="cl-net" textAnchor="middle">{props.stage === 0 ? "SDA HIGH   ·   SCL HIGH" : "SDA LOW   ·   SCL HIGH"}</text>
+    <text x="298" y="240" className="cl-net" textAnchor="middle">SDA {props.sink === "released" ? "HIGH" : "LOW"} · SCL HIGH</text>
   </>;
 }
 
@@ -188,7 +194,7 @@ export function Academy({ initial, onBookmark, saved = [] }: { initial?: string;
       </div>
       <svg className="cl-walk-svg" viewBox="0 0 590 265" aria-label={circuit.title + ", interactive schematic"} role="group">
         <Grid id={id} width={590} height={265} />
-        <g className="cl-schematic-lines">{kind === "reset" ? <ResetDrawing selected={selected} choose={choose} stage={stage} /> : <BusDrawing selected={selected} choose={choose} stage={stage} />}</g>
+        <g className="cl-schematic-lines">{kind === "reset" ? <ResetDrawing selected={selected} choose={choose} stage={stage} /> : <BusDrawing selected={selected} choose={choose} sink={circuit.stages[stage][2] ?? "released"} />}</g>
       </svg>
       <div className="cl-inspector">
         <p className="cl-scope-note">{kind === "reset" ? "Generic active-low input. Values assume an ideal 3.3 V step, no internal pull-up and negligible pin leakage. The MCU’s supply and ground connections are omitted." : "Both devices share a ground reference and a compatible 3.3 V I/O domain. Only the bus nets are shown. The bridge separates R2’s clock connection from SDA."}</p>
