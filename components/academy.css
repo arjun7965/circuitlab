@@ -1,0 +1,88 @@
+.cl-blueprint {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #103c36;
+}
+.cl-academy {
+  color: var(--ink, #1b302c);
+  display: grid;
+  gap: 19px;
+}
+.cl-academy button {
+  font: inherit;
+  cursor: pointer;
+}
+.cl-academy button:focus-visible, .cl-academy a:focus-visible {
+  outline: 3px solid #4b9a71;
+  outline-offset: 3px;
+}
+.cl-switcher, .cl-stages, .cl-component-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.cl-switcher button, .cl-stages button, .cl-component-choices button, .cl-save {
+  border: 1px solid var(--line, #d8dfd5);
+  background: var(--panel, #fffef9);
+  color: var(--ink, #1b302c);
+  border-radius: 7px;
+  padding: 9px 15px;
+  font-size: 14px;
+  font-weight: 550;
+}
+.cl-switcher button[aria-pressed=true], .cl-stages button[aria-pressed=true], .cl-component-choices button[aria-pressed=true] {
+  background: #184c41;
+  color: #e8f6e9;
+  border-color: #184c41;
+}
+.cl-ac-card {
+  overflow: hidden;
+  background: var(--panel, #fffef9);
+  border: 1px solid var(--line, #d8dfd5);
+  border-radius: 13px;
+}
+.cl-ac-intro, .cl-inspector, .cl-sequence { padding: clamp(16px, 3vw, 28px); }
+.cl-ac-intro { display: flex; gap: 14px; justify-content: space-between; align-items: flex-start; }
+.cl-academy :is(h2,h3,p,dl,dd) { margin: 0; }
+.cl-academy h2 { font-size: clamp(22px, 3vw, 28px); line-height: 1.22; letter-spacing: -.04em; }
+.cl-academy h3 { margin: 0 0 7px; font-size: 20px; letter-spacing: -.035em; }
+.cl-academy p, .cl-academy dd { max-width: 78ch; line-height: 1.58; font-size: 14px; color: var(--muted, #4b605a); }
+.cl-ac-intro p { margin: 7px 0 0; }
+.cl-save { padding: 9px; display: grid; place-items: center; }
+.cl-walk-svg { width: 100%; height: auto; max-height: 365px; display: block; background: #103c36; }
+.cl-schematic-lines {
+  font-family: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: 14px;
+  fill: none;
+  stroke: #92e9b3;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cl-schematic-lines text { fill: #e2efdf; stroke: none; }
+.cl-schematic-lines .cl-net, .cl-schematic-lines .cl-value { fill: #bcddca; font-size: 12px; }
+.cl-chip { fill: #143f37; }
+.cl-dot { fill: #92e9b3; }
+.cl-svg-target { cursor: pointer; outline: none; }
+.cl-svg-hit { fill: transparent; stroke: transparent; stroke-width: 1.4; }
+.cl-svg-target:hover .cl-svg-hit, .cl-svg-target:focus-visible .cl-svg-hit { fill: #9ee7bb20; stroke: #a9e5be; }
+.cl-svg-target.is-active .cl-svg-hit { fill: #ceec9e13; stroke: #bfd49a; stroke-dasharray: 4 4; }
+.cl-svg-target:focus-visible .cl-svg-hit { stroke-width: 3; }
+.cl-component-choices { margin-bottom: 16px; }
+.cl-inspector .cl-scope-note { font-size: 12px; line-height: 1.5; margin-bottom: 16px; }
+.cl-component-choices button { font-family: 'IBM Plex Mono', Consolas, monospace; font-size: 12px; padding: 6px 12px; }
+.cl-inspector dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; border-top: 1px solid var(--line,#d8dfd5); margin-top: 17px; padding-top: 17px; }
+.cl-inspector dt { font-weight: 650; font-size: 13px; margin: 0 0 6px; }
+.cl-inspector dd { font-size: 13px; }
+.cl-stages { margin: 12px 0; }
+.cl-stages button { font-size: 13px; }
+.cl-sequence a { display: inline-block; color: var(--teal, #24715a); font-size: 13px; margin-top: 15px; text-underline-offset: 2px; }
+.cl-sequence a + a { margin-left: 14px; }
+@media (max-width: 700px) {
+  .cl-inspector dl { grid-template-columns: 1fr; gap: 13px; }
+  .cl-schematic-lines { font-size: 17px; }
+  .cl-schematic-lines .cl-value, .cl-schematic-lines .cl-net { font-size: 14px; }
+  .cl-walk-svg { min-height: 175px; }
+}
