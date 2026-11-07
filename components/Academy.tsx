@@ -192,6 +192,17 @@ export function Academy({ initial, onBookmark, saved = [] }: { initial?: string;
       <div className="cl-ac-intro"><div><h2>{circuit.title}</h2><p>{circuit.intro}</p></div>
         {onBookmark && <button className="cl-save" aria-pressed={saved.includes(kind)} onClick={() => onBookmark(kind)} aria-label={saved.includes(kind) ? "Remove diagram bookmark" : "Bookmark diagram"}><svg width="19" height="19" viewBox="0 0 24 24" fill={saved.includes(kind) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7"><path d="M6 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17l-6-4-6 4z" /></svg></button>}
       </div>
+    {kind === "reset" && <div className="cl-sequence cl-startup">
+      <h3>Power-up in four steps</h3>
+      <p>Active-low means that a LOW on RESET_N asserts reset and holds the MCU in its reset state. Firmware execution can begin after reset is released and the other startup conditions are met. For the ideal supply step and initially discharged C1 in this example, follow these four steps.</p>
+      <ol className="cl-startup-steps">
+        <li><strong>Power turns on.</strong> C1 starts with zero voltage across it, so RESET_N initially stays near ground and asserts external reset.</li>
+        <li><strong>The capacitor charges.</strong> Current flows through R1 into C1, raising RESET_N toward 3.3 V.</li>
+        <li><strong>External reset is released.</strong> The rising voltage crosses the MCU’s reset-release threshold. Use the device’s specified threshold and timing requirements.</li>
+        <li><strong>The MCU can begin execution.</strong> Startup code begins once all of the MCU’s reset and startup conditions are satisfied, including any internal reset delays, supply checks, and clock readiness requirements.</li>
+      </ol>
+      <p>A gradual supply ramp, residual capacitor charge, or an internal pull-up can change the timing. Follow the MCU datasheet to determine when execution actually starts.</p>
+    </div>}
       <svg className="cl-walk-svg" viewBox="0 0 590 265" aria-label={circuit.title + ", interactive schematic"} role="group">
         <Grid id={id} width={590} height={265} />
         <g className="cl-schematic-lines">{kind === "reset" ? <ResetDrawing selected={selected} choose={choose} stage={stage} /> : <BusDrawing selected={selected} choose={choose} sink={circuit.stages[stage][2] ?? "released"} />}</g>
@@ -204,17 +215,6 @@ export function Academy({ initial, onBookmark, saved = [] }: { initial?: string;
         </div>
       </div>
     </div>
-    {kind === "reset" && <div className="cl-ac-card cl-sequence">
-      <h3>What happens during power-up?</h3>
-      <p>Active-low means that a LOW on RESET_N asserts reset. For the ideal supply step and initially discharged C1 in this example, follow these four steps.</p>
-      <ol className="cl-startup-steps">
-        <li><strong>Power turns on.</strong> C1 starts with zero voltage across it, so RESET_N initially stays near ground and asserts external reset.</li>
-        <li><strong>The capacitor charges.</strong> Current flows through R1 into C1, raising RESET_N toward 3.3 V.</li>
-        <li><strong>External reset is released.</strong> The rising voltage crosses the MCU’s reset-release threshold. Use the device’s specified threshold and timing requirements.</li>
-        <li><strong>The MCU can begin execution.</strong> Startup code begins once all of the MCU’s reset and startup conditions are satisfied, including any internal reset delays, supply checks, and clock readiness requirements.</li>
-      </ol>
-      <p>A gradual supply ramp, residual capacitor charge, or an internal pull-up can change the timing. Follow the MCU datasheet to determine when execution actually starts.</p>
-    </div>}
     <div className="cl-ac-card cl-sequence"><h3>Follow the signal</h3>
       <div className="cl-stages">{circuit.stages.map(([name], i) => <button key={name} onClick={() => setStage(i)} aria-pressed={stage === i}>{name}</button>)}</div>
       <p aria-live="polite">{circuit.stages[stage][1]}</p>
