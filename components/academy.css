@@ -77,6 +77,9 @@
 .cl-inspector dt { font-weight: 650; font-size: 13px; margin: 0 0 6px; }
 .cl-inspector dd { font-size: 13px; }
 .cl-stages { margin: 12px 0; }
+.cl-startup-steps { list-style: decimal; padding-left: 24px; margin: 16px 0; max-width: 78ch; }
+.cl-startup-steps li { padding-left: 5px; margin: 10px 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.cl-startup-steps strong { color: var(--ink); }
 .cl-stages button { font-size: 13px; }
 .cl-sequence a { display: inline-block; color: var(--teal, #24715a); font-size: 13px; margin-top: 15px; text-underline-offset: 2px; }
 .cl-sequence a + a { margin-left: 14px; }

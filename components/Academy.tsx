@@ -74,7 +74,7 @@ type Walkthrough = { title: string; short: string; intro: string; parts: Part[];
 const circuits: Record<"reset" | "i2c", Walkthrough> = {
   reset: {
     title: "MCU reset circuit", short: "MCU reset",
-    intro: "Follow an active-low reset signal from power-up to the first instruction. Select a symbol to inspect its role.",
+    intro: "Follow the reset signal during power-up, button press, and release. Select a symbol to inspect its role.",
     parts: [
       { id: "r1", symbol: "R1", name: "Reset pull-up", purpose: "The resistor charges C1 from the 3.3 V rail and gives RESET_N a defined high level when the button is open.", selection: "10 kΩ here draws 330 µA with the button held. If the MCU includes a pull-up, use the parallel combination when calculating timing.", failure: "Without any pull-up the pin can float. A weak pull-up makes leakage and noise more significant. A strong one increases switch current.", check: "Check the internal pull-up range, input leakage, allowed external drive and reset thresholds." },
       { id: "c1", symbol: "C1", name: "Reset capacitor", purpose: "The capacitor stores charge on RESET_N. With R1 it slows the rising edge after switch release.", selection: "100 nF with 10 kΩ gives a 1 ms time constant. The time to a particular threshold depends on its fraction of the supply.", failure: "Too much capacitance can delay restart or prevent a debug probe from producing a clean reset pulse. Too little reduces noise filtering.", check: "Look up the recommended reset network, allowed capacitance, pulse width and input rise-time limits." },
@@ -204,6 +204,17 @@ export function Academy({ initial, onBookmark, saved = [] }: { initial?: string;
         </div>
       </div>
     </div>
+    {kind === "reset" && <div className="cl-ac-card cl-sequence">
+      <h3>What happens during power-up?</h3>
+      <p>Active-low means that a LOW on RESET_N asserts reset. For the ideal supply step and initially discharged C1 in this example, follow these four steps.</p>
+      <ol className="cl-startup-steps">
+        <li><strong>Power turns on.</strong> C1 starts with zero voltage across it, so RESET_N initially stays near ground and asserts external reset.</li>
+        <li><strong>The capacitor charges.</strong> Current flows through R1 into C1, raising RESET_N toward 3.3 V.</li>
+        <li><strong>External reset is released.</strong> The rising voltage crosses the MCU’s reset-release threshold. Use the device’s specified threshold and timing requirements.</li>
+        <li><strong>The MCU can begin execution.</strong> Startup code begins once all of the MCU’s reset and startup conditions are satisfied, including any internal reset delays, supply checks, and clock readiness requirements.</li>
+      </ol>
+      <p>A gradual supply ramp, residual capacitor charge, or an internal pull-up can change the timing. Follow the MCU datasheet to determine when execution actually starts.</p>
+    </div>}
     <div className="cl-ac-card cl-sequence"><h3>Follow the signal</h3>
       <div className="cl-stages">{circuit.stages.map(([name], i) => <button key={name} onClick={() => setStage(i)} aria-pressed={stage === i}>{name}</button>)}</div>
       <p aria-live="polite">{circuit.stages[stage][1]}</p>
