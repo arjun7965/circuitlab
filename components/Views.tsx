@@ -9,6 +9,7 @@ import {MiniDiagram,WorkArt} from "./Drawings";
 import {Blueprint} from "./Academy";
 import {Experiment} from "./Experiments";
 import {State,toggle} from "./learning";
+import {matchesSearch} from "./search";
 export type Props={s:State; update:(fn:(s:State)=>State)=>void};
 const topicIcons=[Activity,CircuitBoard,BookOpen];
 export const destinations=[
@@ -44,7 +45,7 @@ export function Path({s}:{s:State}){
  return <><Head title="Learning path" desc="Work from electrical fundamentals toward a board-level schematic review."/><div className="tabs">{["All tracks","Beginner","Intermediate","Advanced"].map(x=><button aria-pressed={track===x} key={x} onClick={()=>setTrack(x)}>{x}</button>)}</div><div className="modulelist">{modules.map(([name,desc],i)=>{
  const level=i<4?"Beginner":i<8?"Intermediate":"Advanced";if(track!=="All tracks"&&track!==level)return null;
  const members=lessons.filter(l=>l.module===i+1);
- return <details className="module paper" key={name} open={i===0||undefined}><summary><span className="moduleindex">{String(i+1).padStart(2,"0")}</span><div><small>{level} track</small><h3>{name}</h3></div><span className="statustag">{members.length?members.length+" lessons":"Planned"}</span><ChevronDown size={17}/></summary><div className="modulecontent"><p>Module scope · {desc}</p>{members.length?members.map(l=><Row key={l.slug} lesson={l} done={s.done.includes(l.slug)}/>):<p>Lessons for this module are planned.</p>}</div></details>})}</div></>
+ return <details className="module paper" key={name} open={i===0||undefined}><summary><span className="moduleindex">{String(i+1).padStart(2,"0")}</span><div><small>{level} track</small><h3>{name}</h3></div><span className="statustag">{members.length?members.length+(members.length===1?" lesson":" lessons"):"Planned"}</span><ChevronDown size={17}/></summary><div className="modulecontent"><p>Module scope · {desc}</p>{members.length?members.map(l=><Row key={l.slug} lesson={l} done={s.done.includes(l.slug)}/>):<p>Lessons for this module are planned.</p>}</div></details>})}</div></>
 }
 function Quiz({lesson,s,update}:{lesson:Lesson}&Props){
  const [values,input]=useState<Record<number,string>>({});
@@ -66,9 +67,9 @@ export function Learn({id,s,update}:{id:string}&Props){
 }
 export function Reference({id}:{id?:string}){
  const [query,setQuery]=useState(""),[category,setCategory]=useState("All");
- const filtered=refs.map((r,i)=>({r,i})).filter(({r})=>(category==="All"||r[1]===category)&&r.join(" ").toLowerCase().includes(query.toLowerCase()));
+ const filtered=refs.map((r,i)=>({r,i})).filter(({r})=>(category==="All"||r[1]===category)&&matchesSearch(r.join(" "),query));
  return <><Head title="Quick Reference" desc="Formulas, symbols, and circuit patterns to keep beside a schematic."/>
- <label className="fieldsearch"><Search size={18}/><input placeholder="Search the reference library…" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+ <label className="fieldsearch"><Search size={18}/><input aria-label="Search the reference library" placeholder="Search the reference library…" value={query} onChange={e=>setQuery(e.target.value)}/></label>
  <div className="tabs">{["All","Formulas","Schematic patterns","Terminology","Symbols"].map(x=><button key={x} aria-pressed={x===category} onClick={()=>setCategory(x)}>{x}</button>)}</div><div className="refgrid">{filtered.length===0&&<p>No matching references.</p>}{[...filtered].sort((a,b)=>Number(String(b.i)===id)-Number(String(a.i)===id)).map(({r,i})=><article className={"paper refcard "+(String(i)===id?"selectedref":"")} key={r[0]}><div className="refhead"><small>{r[1]}</small><MiniDiagram kind={r[5]}/></div><h3>{r[0]}</h3><b className="refeq">{r[2]}</b><p>{r[3]}</p><a href={"#"+r[4]}>Open {r[4].startsWith("academy")?"walkthrough":"lesson"} <ArrowRight size={15}/></a></article>)}</div></>
 }
 export function Checklist({s,update}:Props){

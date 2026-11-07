@@ -7,6 +7,7 @@ import {Experiments} from "../components/Experiments";
 import {Academy} from "../components/Academy";
 import {Checklist,Dashboard,Head,Learn,Path,Personal,Reference} from "../components/Views";
 import {empty,readState,State,toggle} from "../components/learning";
+import {matchesSearch} from "../components/search";
 const nav=[
  {id:"dashboard",title:"Dashboard",icon:LayoutDashboard},{id:"path",title:"Learning Path",icon:Route},{id:"playground",title:"Circuit Playground",icon:Activity},{id:"academy",title:"Schematic Academy",icon:CircuitBoard},{id:"reference",title:"Quick Reference",icon:BookOpen},{id:"checklist",title:"Review Checklist",icon:ListChecks},{id:"bookmarks",title:"Bookmarks",icon:Bookmark},{id:"progress",title:"Progress",icon:ChartNoAxesColumnIncreasing}
 ];
@@ -21,7 +22,7 @@ export default function App(){
  const openSearch=useCallback(()=>{search("");if(!dialog.current?.open)dialog.current?.showModal()},[]);
  useEffect(()=>{function key(e:KeyboardEvent){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openSearch()}if(e.key==="Escape")setMobile(false)}window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key)},[openSearch]);
  const update=(fn:(st:State)=>State)=>setState(fn);
- const filtered=searchItems.filter(item=>(item.label+" "+item.keywords).toLowerCase().includes(query.toLowerCase())).slice(0,18);
+ const filtered=searchItems.filter(item=>matchesSearch(item.label+" "+item.keywords,query)).slice(0,18);
  const props={s,update};const percent=Math.round(s.done.length/lessons.length*100);
  return <div className="shell"><a className="skip" href="#content" onClick={e=>{e.preventDefault();document.getElementById("content")?.focus()}}>Skip to content</a>
  {mobile&&<button className="scrim" onClick={()=>setMobile(false)} aria-label="Close navigation"/>}

@@ -186,7 +186,7 @@ export function Academy({ initial, onBookmark, saved = [] }: { initial?: string;
   const part = circuit.parts.find(item => item.id === selected) || circuit.parts[0];
   return <section className="cl-academy" aria-label="Schematic walkthroughs">
     <div className="cl-switcher" aria-label="Choose a walkthrough">
-      {(["reset", "i2c"] as const).map(key => <button key={key} aria-pressed={kind === key} onClick={() => { setKind(key); choose("r1"); setStage(0); }}>{circuits[key].short}</button>)}
+      {(["reset", "i2c"] as const).map(key => <button key={key} aria-pressed={kind === key} onClick={() => { setKind(key); choose("r1"); setStage(0); window.location.hash = "academy/" + key; }}>{circuits[key].short}</button>)}
     </div>
     <div className="cl-ac-card">
       <div className="cl-ac-intro"><div><h2>{circuit.title}</h2><p>{circuit.intro}</p></div>

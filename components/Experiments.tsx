@@ -74,12 +74,12 @@ export function Experiment({id}:{id:string}) {
   return model?<Workbench key={model.id} model={model}/>:null;
 }
 function Explorer({initial}:{initial:string}) {
-  const [id,setId]=useState(models.some(m=>m.id===initial)?initial:"divider");
+  const id=models.some(m=>m.id===initial)?initial:"divider";
   const selectId=useId();
   return <div className="ex-explorer"><div className="ex-picker"><label htmlFor={selectId}><SlidersHorizontal size={17}/> Select experiment</label>
-    <select id={selectId} value={id} onChange={e=>setId(e.target.value)}>{models.map(m=><option key={m.id} value={m.id}>{m.title}</option>)}</select>
+    <select id={selectId} value={id} onChange={e=>{window.location.hash="playground/"+e.target.value;}}>{models.map(m=><option key={m.id} value={m.id}>{m.title}</option>)}</select>
   </div><Experiment id={id}/></div>;
 }
 export function Experiments({initial="divider"}:{initial?:string}) {
-  return <Explorer key={initial} initial={initial}/>;
+  return <Explorer initial={initial}/>;
 }
